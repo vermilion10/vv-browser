@@ -8,13 +8,34 @@ The game is only available from Japan. VV Browser connects to a Japanese [VPN Ga
 
 ## Status
 
-Only the network core (`core/`) exists so far. It runs as a standalone local proxy that any browser can use.
+- `core/`: the network core, a Go library. It also runs as a standalone local proxy that any browser can use.
+- `android/`: the Android app (Android 13 or newer), a full-screen WebView routed through the core.
+
+## Android app
+
+### Requirements
+
+- Android SDK with an NDK installed, and `ANDROID_HOME` set
+- JDK 17 or newer (Android Studio's bundled JBR works)
+- Go 1.26 or newer
+
+### Build
+
+```
+sh scripts/build-core.sh
+cd android
+./gradlew assembleDebug
+```
+
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Sign in with your DMM email address and password. Google sign-in does not work inside an embedded WebView.
 
 ## Network core
 
 ### Requirements
 
-- Go 1.25 or newer
+- Go 1.26 or newer
 
 ### Build
 

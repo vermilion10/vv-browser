@@ -1,6 +1,6 @@
 module vvbrowser/core
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/apex/log v1.9.0
@@ -14,12 +14,21 @@ require (
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/refraction-networking/utls v1.3.1 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/mobile v0.0.0-20260908204917-8b95e45f8d3e // indirect
+	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
+	golang.org/x/tools v0.50.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	gvisor.dev/gvisor v0.0.0-20250503011706-39ed1f5ac29c // indirect
 )
 
 replace github.com/ooni/minivpn => ./third_party/minivpn
+
+tool (
+	golang.org/x/mobile/cmd/gobind
+	golang.org/x/mobile/cmd/gomobile
+)

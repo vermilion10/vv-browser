@@ -132,6 +132,22 @@ func ReadConfigFile(filePath string) (*OpenVPNOptions, error) {
 	return getOptionsFromLines(lines, dir)
 }
 
+// ReadConfig parses config file contents held in memory. Relative paths in
+// the config resolve against dir; configs with inline <ca>, <cert> and <key>
+// blocks need no directory. (vv-browser patch: avoids temporary files, which
+// Android apps cannot create in os.TempDir.)
+func ReadConfig(content []byte, dir string) (*OpenVPNOptions, error) {
+	lines := make([]string, 0)
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return getOptionsFromLines(lines, dir)
+}
+
 // ShouldLoadCertsFromPath returns true when the options object is configured to load
 // certificates from paths; false when we have inline certificates.
 func (o *OpenVPNOptions) ShouldLoadCertsFromPath() bool {

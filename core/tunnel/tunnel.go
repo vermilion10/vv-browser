@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -200,22 +199,10 @@ func filterOVPN(ovpn []byte) []byte {
 	return out.Bytes()
 }
 
-// parseOVPN feeds the config through minivpn's file parser, which is the
-// only exported entry point for it.
+// parseOVPN parses an .ovpn file's contents. Only inline certificates are
+// supported, since there is no directory to resolve file paths against.
 func parseOVPN(ovpn []byte) (*config.OpenVPNOptions, error) {
-	f, err := os.CreateTemp("", "vvcore-*.ovpn")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.Write(filterOVPN(ovpn)); err != nil {
-		f.Close()
-		return nil, err
-	}
-	if err := f.Close(); err != nil {
-		return nil, err
-	}
-	opts, err := config.ReadConfigFile(f.Name())
+	opts, err := config.ReadConfig(filterOVPN(ovpn), "")
 	if err != nil {
 		return nil, err
 	}
