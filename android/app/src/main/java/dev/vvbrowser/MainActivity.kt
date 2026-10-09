@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import dev.vvbrowser.mobile.Logger
 import dev.vvbrowser.mobile.Mobile
@@ -95,6 +96,11 @@ class MainActivity : ComponentActivity() {
             settings.builtInZoomControls = false
             webViewClient = GameWebViewClient()
             webChromeClient = FullscreenChromeClient()
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            // Ubitus picks the stream profile from navigator.platform. Android
+            // gets at most 768x432 at 1.5 Mbps, desktop 1280x720 at up to 8 Mbps.
+            WebViewCompat.addDocumentStartJavaScript(webView, DESKTOP_PLATFORM_JS, setOf(UBITUS_ORIGIN))
         }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
@@ -255,5 +261,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "vvbrowser"
         const val GAME_URL = "https://play-cloud.games.dmm.com/cloudgame/gameplay/doaxvv"
+        private const val UBITUS_ORIGIN = "https://dcgp-game.ugamenow.com"
+        private const val DESKTOP_PLATFORM_JS =
+            "Object.defineProperty(Navigator.prototype, 'platform', { get: () => 'Win32' });"
     }
 }
