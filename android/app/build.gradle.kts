@@ -17,9 +17,27 @@ android {
         versionName = "0.1.0"
     }
 
+    // Release signing is read from the user's Gradle properties
+    // (~/.gradle/gradle.properties), never from the repository. Without them,
+    // release builds are left unsigned.
+    val storeFile = providers.gradleProperty("VV_RELEASE_STORE_FILE").orNull
+    signingConfigs {
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = providers.gradleProperty("VV_RELEASE_STORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("VV_RELEASE_KEY_ALIAS").get()
+                keyPassword = providers.gradleProperty("VV_RELEASE_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+            // Phones and tablets only; the x86_64 core is for the emulator.
+            ndk { abiFilters += "arm64-v8a" }
         }
     }
 

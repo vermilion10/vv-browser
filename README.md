@@ -42,6 +42,15 @@ cd android
 
 The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
+For a release build (phones and tablets only, arm64), run `./gradlew assembleRelease`. To sign it, add these properties to the `gradle.properties` file in your Gradle user home (`~/.gradle`, or `GRADLE_USER_HOME` if set). Without them, the release APK is left unsigned.
+
+```
+VV_RELEASE_STORE_FILE=/path/to/release.jks
+VV_RELEASE_STORE_PASSWORD=...
+VV_RELEASE_KEY_ALIAS=...
+VV_RELEASE_KEY_PASSWORD=...
+```
+
 Sign in with your DMM email address and password. Google sign-in does not work inside an embedded WebView.
 
 ## Desktop app (Windows)

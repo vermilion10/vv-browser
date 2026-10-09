@@ -14,6 +14,7 @@ fi
 mkdir -p "$root/android/app/libs"
 cd "$root/core"
 go tool gomobile bind \
+    -trimpath -ldflags "-s -w" \
     -target=android/arm64,android/amd64 \
     -androidapi 33 \
     -javapkg dev.vvbrowser \
