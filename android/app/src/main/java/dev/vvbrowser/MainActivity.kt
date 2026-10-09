@@ -192,6 +192,7 @@ class MainActivity : ComponentActivity() {
         val items = arrayOf(
             getString(R.string.menu_resume),
             getString(R.string.menu_reload),
+            getString(R.string.menu_switch_relay),
             getString(R.string.menu_quality, getString(Quality.of(quality).label)),
             getString(if (hideBars) R.string.menu_show_bars else R.string.menu_hide_bars),
             getString(R.string.menu_exit),
@@ -200,13 +201,14 @@ class MainActivity : ComponentActivity() {
             .setItems(items) { _, which ->
                 when (which) {
                     1 -> reloadGame()
-                    2 -> showQualityPicker()
-                    3 -> {
+                    2 -> switchRelay()
+                    3 -> showQualityPicker()
+                    4 -> {
                         prefs.edit { putBoolean(PREF_HIDE_BARS, !hideBars) }
                         installPageScript()
                         reloadGame()
                     }
-                    4 -> finish()
+                    5 -> finish()
                 }
             }
             .show()
@@ -228,6 +230,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
             .show()
+    }
+
+    /**
+     * Moves to the next best relay. This changes the IP DMM sees, so it is
+     * meant for a relay that has become slow or unreliable.
+     */
+    private fun switchRelay() {
+        connecting = true
+        statusPanel.visibility = View.VISIBLE
+        retry.visibility = View.GONE
+        status.text = getString(R.string.status_switching)
+        detail.text = ""
+        worker.execute {
+            try {
+                Mobile.switchRelay()
+                main.post {
+                    connecting = false
+                    statusPanel.visibility = View.GONE
+                    reloadGame()
+                }
+            } catch (e: Exception) {
+                main.post { showError(e.message ?: e.toString()) }
+            }
+        }
     }
 
     /** Reloads the DMM page, which also starts a new stream session. */

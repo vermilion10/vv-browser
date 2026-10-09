@@ -95,6 +95,8 @@ struct Core {
     /// The loading screen, used to come back to it on errors.
     loading_url: Url,
     child: Mutex<Option<CommandChild>>,
+    /// Relays skipped for the rest of this run (see "Switch relay").
+    avoid: Mutex<Vec<String>>,
     /// Bumped on every (re)start so events from an old process are ignored.
     generation: AtomicU64,
 }
@@ -119,6 +121,7 @@ fn main() {
                 port,
                 loading_url: window.url()?,
                 child: Mutex::new(None),
+                avoid: Mutex::new(Vec::new()),
                 generation: AtomicU64::new(0),
             });
             start_core(app.handle())?;
@@ -155,6 +158,7 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<Wry>> 
         true,
         &[
             &MenuItem::with_id(app, "reload", "&Reload game", true, Some("F5"))?,
+            &MenuItem::with_id(app, "switch_relay", "&Switch relay", true, None::<&str>)?,
             &Submenu::with_items(app, "Stream &quality", true, &quality_items)?,
             &CheckMenuItem::with_id(app, "hide_bars", "&Hide DMM header and footer", true, settings.hide_bars, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
@@ -178,6 +182,10 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
             app.exit(0);
             return;
         }
+        "switch_relay" => {
+            switch_relay(app);
+            return;
+        }
         "hide_bars" => settings.hide_bars = !settings.hide_bars,
         _ => match id.strip_prefix("quality:") {
             Some(q) if q != settings.quality => settings.quality = q.to_string(),
@@ -198,6 +206,32 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     app.restart();
 }
 
+/// Moves to the next best relay: forgets the saved one, restarts the core
+/// with it excluded, and shows the loading screen until the new one is up.
+/// This changes the IP DMM sees, so it is meant for a relay that has become
+/// slow or unreliable.
+fn switch_relay(app: &AppHandle) {
+    let saved = app.path().app_data_dir().ok().map(|d| d.join("relay.json"));
+    let current = saved
+        .as_ref()
+        .and_then(|p| std::fs::read(p).ok())
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| v.get("ID").and_then(|id| id.as_str()).map(String::from));
+    if let Some(path) = &saved {
+        let _ = std::fs::remove_file(path);
+    }
+    let core = app.state::<Core>();
+    if let Some(id) = current {
+        core.avoid.lock().unwrap().push(id);
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.navigate(core.loading_url.clone());
+    }
+    if let Err(e) = start_core(app) {
+        show_error(app, &e.to_string());
+    }
+}
+
 fn free_port() -> std::io::Result<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
 }
@@ -214,6 +248,7 @@ fn start_core(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .sidecar("vvcore")?
         .args(["-listen", &format!("127.0.0.1:{}", core.port)])
         .args(state_dir_args(app))
+        .args(avoid_args(&core))
         .spawn()?;
     *core.child.lock().unwrap() = Some(child);
 
@@ -264,6 +299,15 @@ fn state_dir_args(app: &AppHandle) -> Vec<String> {
     match app.path().app_data_dir() {
         Ok(dir) => vec!["-state-dir".into(), dir.to_string_lossy().into_owned()],
         Err(_) => Vec::new(),
+    }
+}
+
+fn avoid_args(core: &Core) -> Vec<String> {
+    let avoid = core.avoid.lock().unwrap();
+    if avoid.is_empty() {
+        Vec::new()
+    } else {
+        vec!["-avoid".into(), avoid.join(",")]
     }
 }
 

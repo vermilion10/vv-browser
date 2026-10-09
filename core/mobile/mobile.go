@@ -79,6 +79,16 @@ func Connect() error {
 	return eng.Connect(context.Background())
 }
 
+// SwitchRelay drops the current relay and connects to the next best one,
+// blocking until it is up.
+func SwitchRelay() error {
+	eng := get()
+	if eng == nil {
+		return errors.New("mobile: not started")
+	}
+	return eng.SwitchRelay(context.Background())
+}
+
 // ExitInfo returns ipinfo.io's JSON for the tunnel's exit address.
 func ExitInfo() (string, error) {
 	eng := get()

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/apex/log"
@@ -26,6 +27,7 @@ func main() {
 	check := flag.Bool("check", false, "connect, print the tunnel's exit IP info, and exit")
 	verbose := flag.Bool("v", false, "verbose OpenVPN logging")
 	stateDir := flag.String("state-dir", "", "directory for state kept across runs (the preferred relay)")
+	avoid := flag.String("avoid", "", "comma-separated relay IDs not to use (as saved in the state dir)")
 	flag.Parse()
 
 	log.SetHandler(text.New(os.Stderr))
@@ -35,6 +37,9 @@ func main() {
 	}
 
 	opts := engine.Options{Listen: *listen, Country: *country, MTU: *mtu, StateDir: *stateDir}
+	if *avoid != "" {
+		opts.Avoid = strings.Split(*avoid, ",")
+	}
 	if *ovpn != "" {
 		b, err := os.ReadFile(*ovpn)
 		if err != nil {

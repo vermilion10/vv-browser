@@ -40,8 +40,10 @@ type Manager struct {
 	// across launches.
 	StatePath string
 
-	mu  sync.Mutex
-	cur *Tunnel
+	mu      sync.Mutex
+	cur     *Tunnel
+	curID   string
+	avoided map[string]bool
 }
 
 // Get returns the live tunnel, connecting first if there is none.
@@ -75,6 +77,7 @@ func (m *Manager) Get(ctx context.Context) (*Tunnel, error) {
 	if len(cands) == 0 {
 		return nil, errors.New("tunnel: no servers to try")
 	}
+	cands = m.withoutAvoided(cands)
 	if m.MaxAttempts > 0 && len(cands) > m.MaxAttempts {
 		cands = cands[:m.MaxAttempts]
 	}
@@ -94,7 +97,7 @@ func (m *Manager) Get(ctx context.Context) (*Tunnel, error) {
 			continue
 		}
 		log.Infof("tunnel: up via %s (local %s)", c.Name, t.LocalIP())
-		m.cur = t
+		m.cur, m.curID = t, c.ID
 		m.savePreferred(c)
 		return t, nil
 	}
@@ -144,6 +147,50 @@ func (m *Manager) savePreferred(c Candidate) {
 	if err != nil {
 		log.WithError(err).Warn("tunnel: cannot save the preferred server")
 	}
+}
+
+// SwitchServer drops the current server and the saved preference, and
+// avoids that server for the rest of this run. The next Get connects to the
+// next best one.
+func (m *Manager) SwitchServer() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.curID != "" {
+		if m.avoided == nil {
+			m.avoided = map[string]bool{}
+		}
+		m.avoided[m.curID] = true
+	}
+	if m.cur != nil {
+		m.cur.Close()
+		m.cur, m.curID = nil, ""
+	}
+	m.ForgetPreferred()
+}
+
+// Avoid excludes servers by ID for the rest of this run.
+func (m *Manager) Avoid(ids ...string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.avoided == nil {
+		m.avoided = map[string]bool{}
+	}
+	for _, id := range ids {
+		m.avoided[id] = true
+	}
+}
+
+func (m *Manager) withoutAvoided(cands []Candidate) []Candidate {
+	if len(m.avoided) == 0 {
+		return cands
+	}
+	out := make([]Candidate, 0, len(cands))
+	for _, c := range cands {
+		if !m.avoided[c.ID] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // ForgetPreferred drops the saved server, so the next connect starts from

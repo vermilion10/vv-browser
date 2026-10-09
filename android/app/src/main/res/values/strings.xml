@@ -10,6 +10,8 @@
     <string name="menu_quality">Stream quality: %1$s</string>
     <string name="menu_hide_bars">Hide DMM header and footer</string>
     <string name="menu_show_bars">Show DMM header and footer</string>
+    <string name="menu_switch_relay">Switch relay</string>
+    <string name="status_switching">Switching to another relay…</string>
     <string name="menu_exit">Exit</string>
     <string name="quality_title">Stream quality</string>
     <string name="quality_high">High</string>

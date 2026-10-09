@@ -34,6 +34,8 @@ type Options struct {
 	MTU int
 	// StateDir, if set, keeps state across runs (the preferred relay).
 	StateDir string
+	// Avoid lists relay IDs not to use in this run.
+	Avoid []string
 }
 
 func (o *Options) setDefaults() {
@@ -68,6 +70,7 @@ func New(opts Options) *Engine {
 		AttemptTimeout: 20 * time.Second,
 		MaxAttempts:    8,
 	}
+	mgr.Avoid(opts.Avoid...)
 	// A custom config always wins, so only the VPN Gate mode remembers relays.
 	if opts.StateDir != "" && len(opts.OVPN) == 0 {
 		mgr.StatePath = filepath.Join(opts.StateDir, "relay.json")
@@ -90,6 +93,12 @@ func New(opts Options) *Engine {
 func (e *Engine) Connect(ctx context.Context) error {
 	_, err := e.Tunnel.Get(ctx)
 	return err
+}
+
+// SwitchRelay moves to the next best relay and connects to it.
+func (e *Engine) SwitchRelay(ctx context.Context) error {
+	e.Tunnel.SwitchServer()
+	return e.Connect(ctx)
 }
 
 // Listen binds the proxy and starts serving in the background. It returns
