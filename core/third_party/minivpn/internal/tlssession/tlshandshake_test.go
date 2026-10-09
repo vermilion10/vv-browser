@@ -108,18 +108,21 @@ func writeTestingCerts(dir string) (testingCert, error) {
 		return testingCert{}, err
 	}
 	certFile.Write(pemTestingCertificate)
+	certFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	keyFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	keyFile.Write(pemTestingKey)
+	keyFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	caFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	caFile.Write(pemTestingCa)
+	caFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	testingCert := testingCert{
 		cert: certFile.Name(),
@@ -135,18 +138,21 @@ func writeTestingCertsBadCAFile(dir string) (testingCert, error) {
 		return testingCert{}, err
 	}
 	certFile.Write(pemTestingCertificate)
+	certFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	keyFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	keyFile.Write(pemTestingKey)
+	keyFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	caFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	caFile.Write(pemTestingCa[:len(pemTestingCa)-10])
+	caFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	testingCert := testingCert{
 		cert: certFile.Name(),
@@ -162,18 +168,21 @@ func writeTestingCertsBadCA(dir string) (testingCert, error) {
 		return testingCert{}, err
 	}
 	certFile.Write(pemTestingCertificate)
+	certFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	keyFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	keyFile.Write(pemTestingKey)
+	keyFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	caFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	caFile.Write(pemTestingCa[:len(pemTestingCa)-10])
+	caFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	testingCert := testingCert{
 		cert: certFile.Name(),
@@ -189,18 +198,21 @@ func writeTestingCertsBadKey(dir string) (testingCert, error) {
 		return testingCert{}, err
 	}
 	certFile.Write(pemTestingCertificate)
+	certFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	keyFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	keyFile.Write(pemTestingKey[:len(pemTestingKey)-10])
+	keyFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	caFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	caFile.Write(pemTestingCa)
+	caFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	testingCert := testingCert{
 		cert: certFile.Name(),
@@ -216,18 +228,21 @@ func writeTestingCertsBadCert(dir string) (testingCert, error) {
 		return testingCert{}, err
 	}
 	certFile.Write(pemTestingCertificate[:len(pemTestingCertificate)-10])
+	certFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	keyFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	keyFile.Write(pemTestingKey[:len(pemTestingKey)-10])
+	keyFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	caFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return testingCert{}, err
 	}
 	caFile.Write(pemTestingCa)
+	caFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	testingCert := testingCert{
 		cert: certFile.Name(),

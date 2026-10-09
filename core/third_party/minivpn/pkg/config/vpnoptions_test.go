@@ -265,6 +265,7 @@ func writeDummyConfigFile(dir string) (string, error) {
 		return "", err
 	}
 	f.Write(dummyConfigFile)
+	f.Close() // vv-browser patch: open files cannot be removed on Windows
 	return f.Name(), nil
 }
 
@@ -530,6 +531,7 @@ func Test_parseAuthUser(t *testing.T) {
 		if _, err := f.Write([]byte(credStr)); err != nil {
 			t.Fatal(err)
 		}
+		f.Close() // vv-browser patch: open files cannot be removed on Windows
 		return f.Name()
 	}
 
@@ -648,6 +650,7 @@ func Test_getCredentialsFromFile(t *testing.T) {
 		if _, err := f.Write([]byte(credStr)); err != nil {
 			t.Fatal(err)
 		}
+		f.Close() // vv-browser patch: open files cannot be removed on Windows
 		return f.Name()
 	}
 

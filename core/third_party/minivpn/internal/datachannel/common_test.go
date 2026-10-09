@@ -17,6 +17,9 @@ func makeTestingSession() *session.Manager {
 	manager, err := session.NewManager(config.NewConfig())
 	runtimex.PanicOnError(err, "could not get session manager")
 	manager.SetRemoteSessionID(model.SessionID{0x01})
+	// vv-browser patch: the fixtures below expect P_DATA_V2 framing, which
+	// is only used once the server has pushed a peer-id.
+	manager.UpdateTunnelInfo(&model.TunnelInfo{HasPeerID: true})
 	return manager
 }
 
@@ -101,4 +104,20 @@ func makeTestingDataChannelKey() *session.DataChannelKey {
 	dck.AddLocalKey(ksLocal)
 	dck.AddRemoteKey(ksRemote)
 	return dck
+}
+
+// vv-browser patch: without a pushed peer-id, data packets use P_DATA_V1:
+// a single opcode/key byte and no peer-id.
+func Test_dataHeader(t *testing.T) {
+	v1, err := session.NewManager(config.NewConfig())
+	runtimex.PanicOnError(err, "could not get session manager")
+	if got := dataHeader(v1); !bytes.Equal(got, []byte{byte(model.P_DATA_V1) << 3}) {
+		t.Errorf("without peer-id: dataHeader() = %x, want P_DATA_V1 with no peer-id", got)
+	}
+
+	v2 := makeTestingSession()
+	v2.UpdateTunnelInfo(&model.TunnelInfo{PeerID: 7, HasPeerID: true})
+	if got := dataHeader(v2); !bytes.Equal(got, []byte{byte(model.P_DATA_V2) << 3, 0, 0, 7}) {
+		t.Errorf("with peer-id: dataHeader() = %x, want P_DATA_V2 followed by peer-id 7", got)
+	}
 }

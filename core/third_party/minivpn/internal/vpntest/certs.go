@@ -92,18 +92,21 @@ func WriteTestingCerts(dir string) (TestingCert, error) {
 		return TestingCert{}, err
 	}
 	certFile.Write(pemTestingCertificate)
+	certFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	keyFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return TestingCert{}, err
 	}
 	keyFile.Write(pemTestingKey)
+	keyFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	caFile, err := os.CreateTemp(dir, "tmpfile-")
 	if err != nil {
 		return TestingCert{}, err
 	}
 	caFile.Write(pemTestingCa)
+	caFile.Close() // vv-browser patch: open files cannot be removed on Windows
 
 	testingCert := TestingCert{
 		Cert: certFile.Name(),

@@ -12,4 +12,4 @@ This is a vendored copy of [ooni/minivpn](https://github.com/ooni/minivpn) v0.0.
 | `pkg/config/vpnoptions.go` | `ReadConfig` parses a config from memory. Android apps cannot create files in `os.TempDir`. |
 | `internal/tun/tun.go` | The TUN closes when the workers shut down, so a connection closed by the server surfaces as a Read/Write error instead of a hang. |
 
-The `datachannel` unit tests still assume `P_DATA_V2` framing without a pushed `peer-id`, and fail accordingly.
+Tests were adjusted to match: the `datachannel` fixtures declare a pushed `peer-id` so they keep exercising `P_DATA_V2`, a new test covers `P_DATA_V1` framing, and test helpers close the temporary files they write, which Windows cannot otherwise delete.

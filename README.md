@@ -5,6 +5,8 @@ A dedicated browser for the cloud version of DEAD OR ALIVE Xtreme Venus Vacation
 The game is only available from Japan. VV Browser connects to a Japanese [VPN Gate](https://www.vpngate.net/) relay inside the app. Only the hosts that check your region (DMM and the cloud-gaming login) go through it, and the game's video stream connects directly for lower latency. No system-wide VPN is used, so other apps and VPNs on the device are unaffected.
 
 > Accessing DMM GAMES from outside its supported regions may violate DMM's terms of service. Use at your own risk.
+>
+> VV Browser is an unofficial project. It is not affiliated with or endorsed by DMM, Koei Tecmo, Ubitus or VPN Gate. DEAD OR ALIVE Xtreme Venus Vacation is a trademark of its respective owner.
 
 ## Status
 
@@ -111,6 +113,13 @@ chrome.exe --user-data-dir=%TEMP%\vvbrowser --proxy-server=http://127.0.0.1:8899
 | `*.dmm.com`, `*.dmm.co.jp`, `*.dmmapis.com`, `dcgp-game.ugamenow.com`, `ipinfo.io` | Through the Japanese relay |
 | `gc-*.ugamenow.com` (game stream) and everything else | Direct |
 
+## Acknowledgements
+
+- [minivpn](https://github.com/ooni/minivpn) by OONI: the userspace OpenVPN client the core is built on
+- [wireguard-go](https://git.zx2c4.com/wireguard-go/) netstack, based on [gVisor](https://gvisor.dev/): the userspace TCP/IP stack
+- [VPN Gate](https://www.vpngate.net/), the academic public relay service run by the University of Tsukuba
+- [Tauri](https://tauri.app/) for the desktop app
+
 ## License
 
-GPL-3.0-or-later. The bundled OpenVPN implementation is a modified copy of [minivpn](https://github.com/ooni/minivpn); see `core/third_party/minivpn/VV_PATCHES.md`.
+GPL-3.0-or-later; see `LICENSE`. The bundled OpenVPN implementation is a modified copy of [minivpn](https://github.com/ooni/minivpn); see `core/third_party/minivpn/VV_PATCHES.md`.
