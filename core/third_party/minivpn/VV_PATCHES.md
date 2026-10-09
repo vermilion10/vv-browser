@@ -5,6 +5,7 @@ This is a vendored copy of [ooni/minivpn](https://github.com/ooni/minivpn) v0.0.
 | File | Change |
 |---|---|
 | `internal/tlssession/tlshandshake.go` | Peer certificate verification now uses the intermediates the server sends. Previously, leaf certificates issued by a public CA (e.g. Let's Encrypt) failed with "unknown authority". |
+| `internal/tlssession/tlssession.go` | A rejected login ("bad auth") or a failed TLS handshake now fails the connection immediately, instead of waiting for the handshake timeout. |
 | `internal/model/tunnelinfo.go`, `internal/tlssession/controlmsg.go`, `internal/session/manager.go` | Track whether the server pushed a `peer-id`. |
 | `internal/datachannel/write.go`, `read.go`, `controller.go`, `internal/model/packet.go` | Use `P_DATA_V1` framing when no `peer-id` was pushed, as the OpenVPN protocol requires. Previously `P_DATA_V2` was always sent, and servers that only speak V1 silently dropped it. |
 | `internal/datachannel/service.go` | Received keepalive pings are dropped without printing a hex dump. |

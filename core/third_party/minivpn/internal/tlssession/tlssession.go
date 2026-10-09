@@ -92,8 +92,14 @@ func (ws *workersState) worker() {
 
 					// TODO(ainghazal): pass the failure to the tracer too.
 
-					if errors.Is(err, ErrBadCA) {
-						ws.sessionManager.Failure <- err
+					// vv-browser patch: a rejected login or a failed TLS handshake
+					// will not recover either, so fail fast and let the caller
+					// try another server instead of waiting for the timeout.
+					if errors.Is(err, ErrBadCA) || errors.Is(err, errBadAuth) || errors.Is(err, ErrBadTLSHandshake) {
+						select {
+						case ws.sessionManager.Failure <- err:
+						case <-ws.workersManager.ShouldShutdown():
+						}
 						return
 					}
 					// The following errors are not handled, will just appear

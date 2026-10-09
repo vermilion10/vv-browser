@@ -10,6 +10,9 @@ The game is only available from Japan. VV Browser connects to a Japanese [VPN Ga
 
 - `core/`: the network core, a Go library. It also runs as a standalone local proxy that any browser can use.
 - `android/`: the Android app (Android 13 or newer), a full-screen WebView routed through the core.
+- `desktop/`: the Windows app, a Tauri window that runs the core as a sidecar process.
+
+Both apps request the stream's high quality tier (1280x720, 6-8 Mbps) rather than the default 2 Mbps.
 
 ## Android app
 
@@ -30,6 +33,26 @@ cd android
 The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Sign in with your DMM email address and password. Google sign-in does not work inside an embedded WebView.
+
+## Desktop app (Windows)
+
+### Requirements
+
+- Rust (stable) with the MSVC toolchain
+- Node.js 20 or newer
+- Go 1.26 or newer
+- Microsoft Edge WebView2 Runtime (included with Windows 11)
+
+### Build
+
+```
+sh scripts/build-desktop-core.sh
+cd desktop
+npm install
+npm run build
+```
+
+The installer is written to `desktop/src-tauri/target/release/bundle/nsis/`. For a development build, run `npm run dev` instead of `npm run build`.
 
 ## Network core
 
