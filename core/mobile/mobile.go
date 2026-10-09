@@ -51,16 +51,16 @@ var (
 )
 
 // Start begins listening on a free loopback port and returns its
-// "host:port". The tunnel is brought up by Connect; until then, requests
-// routed through it wait for the handshake. Calling Start again returns the
-// existing address.
-func Start() (string, error) {
+// "host:port". stateDir keeps the preferred relay across launches. The
+// tunnel is brought up by Connect; until then, requests routed through it
+// wait for the handshake. Calling Start again returns the existing address.
+func Start(stateDir string) (string, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	if current != nil {
 		return addr, nil
 	}
-	eng := engine.New(engine.Options{})
+	eng := engine.New(engine.Options{StateDir: stateDir})
 	a, err := eng.Listen()
 	if err != nil {
 		return "", err

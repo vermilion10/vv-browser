@@ -25,6 +25,7 @@ func main() {
 	mtu := flag.Int("mtu", 1400, "MTU of the userspace tunnel interface")
 	check := flag.Bool("check", false, "connect, print the tunnel's exit IP info, and exit")
 	verbose := flag.Bool("v", false, "verbose OpenVPN logging")
+	stateDir := flag.String("state-dir", "", "directory for state kept across runs (the preferred relay)")
 	flag.Parse()
 
 	log.SetHandler(text.New(os.Stderr))
@@ -33,7 +34,7 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	opts := engine.Options{Listen: *listen, Country: *country, MTU: *mtu}
+	opts := engine.Options{Listen: *listen, Country: *country, MTU: *mtu, StateDir: *stateDir}
 	if *ovpn != "" {
 		b, err := os.ReadFile(*ovpn)
 		if err != nil {

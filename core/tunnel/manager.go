@@ -2,9 +2,12 @@ package tunnel
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -13,6 +16,9 @@ import (
 
 // Candidate is a server the Manager may connect to.
 type Candidate struct {
+	// ID identifies the server across server-list refreshes.
+	ID string
+	// Name labels the server in logs.
 	Name   string
 	Config []byte
 }
@@ -28,10 +34,14 @@ type Manager struct {
 	AttemptTimeout time.Duration
 	// MaxAttempts caps how many candidates one connect cycle tries.
 	MaxAttempts int
+	// StatePath, if set, is a file remembering the last server that
+	// worked. It is tried first on later connects, even after it drops out
+	// of the server list, so the exit IP seen by websites stays the same
+	// across launches.
+	StatePath string
 
-	mu       sync.Mutex
-	cur      *Tunnel
-	lastGood string
+	mu  sync.Mutex
+	cur *Tunnel
 }
 
 // Get returns the live tunnel, connecting first if there is none.
@@ -49,13 +59,22 @@ func (m *Manager) Get(ctx context.Context) (*Tunnel, error) {
 	}
 
 	cands, err := m.Candidates(ctx)
+	preferred, havePreferred := m.loadPreferred()
 	if err != nil {
-		return nil, fmt.Errorf("tunnel: listing servers: %w", err)
+		if !havePreferred {
+			return nil, fmt.Errorf("tunnel: listing servers: %w", err)
+		}
+		log.WithError(err).Warn("tunnel: cannot list servers, trying the saved one only")
+	}
+	if havePreferred {
+		// VPN Gate relays sometimes reject a login and accept the next one;
+		// a second try is cheaper than a new exit IP.
+		cands = putFirst(cands, preferred)
+		cands = append([]Candidate{cands[0]}, cands...)
 	}
 	if len(cands) == 0 {
 		return nil, errors.New("tunnel: no servers to try")
 	}
-	cands = m.preferLastGood(cands)
 	if m.MaxAttempts > 0 && len(cands) > m.MaxAttempts {
 		cands = cands[:m.MaxAttempts]
 	}
@@ -75,20 +94,64 @@ func (m *Manager) Get(ctx context.Context) (*Tunnel, error) {
 			continue
 		}
 		log.Infof("tunnel: up via %s (local %s)", c.Name, t.LocalIP())
-		m.cur, m.lastGood = t, c.Name
+		m.cur = t
+		m.savePreferred(c)
 		return t, nil
 	}
 	return nil, fmt.Errorf("tunnel: all servers failed: %w", errors.Join(errs...))
 }
 
-func (m *Manager) preferLastGood(cands []Candidate) []Candidate {
-	for i, c := range cands {
-		if c.Name == m.lastGood && i > 0 {
-			out := append([]Candidate{c}, cands[:i]...)
-			return append(out, cands[i+1:]...)
+// putFirst moves the candidate with p's ID to the front, or prepends p if
+// the list no longer has it.
+func putFirst(cands []Candidate, p Candidate) []Candidate {
+	out := []Candidate{p}
+	for _, c := range cands {
+		if c.ID == p.ID {
+			out[0] = c // fresher config and stats
+			continue
 		}
+		out = append(out, c)
 	}
-	return cands
+	return out
+}
+
+func (m *Manager) loadPreferred() (Candidate, bool) {
+	if m.StatePath == "" {
+		return Candidate{}, false
+	}
+	b, err := os.ReadFile(m.StatePath)
+	if err != nil {
+		return Candidate{}, false
+	}
+	var c Candidate
+	if err := json.Unmarshal(b, &c); err != nil || c.ID == "" || len(c.Config) == 0 {
+		return Candidate{}, false
+	}
+	return c, true
+}
+
+func (m *Manager) savePreferred(c Candidate) {
+	if m.StatePath == "" || c.ID == "" {
+		return
+	}
+	b, err := json.Marshal(c)
+	if err == nil {
+		err = os.MkdirAll(filepath.Dir(m.StatePath), 0o700)
+	}
+	if err == nil {
+		err = os.WriteFile(m.StatePath, b, 0o600)
+	}
+	if err != nil {
+		log.WithError(err).Warn("tunnel: cannot save the preferred server")
+	}
+}
+
+// ForgetPreferred drops the saved server, so the next connect starts from
+// the top of the server list.
+func (m *Manager) ForgetPreferred() {
+	if m.StatePath != "" {
+		os.Remove(m.StatePath)
+	}
 }
 
 // DialContext dials through the current tunnel, bringing one up if needed.

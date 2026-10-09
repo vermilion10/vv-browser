@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/apex/log"
@@ -31,6 +32,8 @@ type Options struct {
 	OVPNName string
 	// MTU of the userspace tunnel interface.
 	MTU int
+	// StateDir, if set, keeps state across runs (the preferred relay).
+	StateDir string
 }
 
 func (o *Options) setDefaults() {
@@ -64,6 +67,10 @@ func New(opts Options) *Engine {
 		MTU:            opts.MTU,
 		AttemptTimeout: 20 * time.Second,
 		MaxAttempts:    8,
+	}
+	// A custom config always wins, so only the VPN Gate mode remembers relays.
+	if opts.StateDir != "" && len(opts.OVPN) == 0 {
+		mgr.StatePath = filepath.Join(opts.StateDir, "relay.json")
 	}
 	return &Engine{
 		Tunnel: mgr,
@@ -111,7 +118,7 @@ func (e *Engine) Close() error {
 
 func candidates(opts Options) func(context.Context) ([]tunnel.Candidate, error) {
 	if len(opts.OVPN) > 0 {
-		c := tunnel.Candidate{Name: opts.OVPNName, Config: opts.OVPN}
+		c := tunnel.Candidate{ID: "ovpn:" + opts.OVPNName, Name: opts.OVPNName, Config: opts.OVPN}
 		return func(context.Context) ([]tunnel.Candidate, error) {
 			return []tunnel.Candidate{c}, nil
 		}
@@ -128,6 +135,7 @@ func candidates(opts Options) func(context.Context) ([]tunnel.Candidate, error) 
 		out := make([]tunnel.Candidate, 0, len(servers))
 		for _, s := range servers {
 			out = append(out, tunnel.Candidate{
+				ID:   "vpngate:" + s.HostName,
 				Name:   fmt.Sprintf("%s (%s, %d ms, %.0f Mbps)", s.HostName, s.IP, s.PingMS, float64(s.SpeedBps)/1e6),
 				Config: s.Config,
 			})

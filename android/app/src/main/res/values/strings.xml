@@ -5,4 +5,17 @@
     <string name="status_failed">Could not connect</string>
     <string name="retry">Retry</string>
     <string name="error_webview_too_old">This device\'s Android System WebView does not support per-app proxies. Update Android System WebView from the Play Store and try again.</string>
+    <string name="menu_resume">Resume</string>
+    <string name="menu_reload">Reload game</string>
+    <string name="menu_quality">Stream quality: %1$s</string>
+    <string name="menu_hide_bars">Hide DMM header and footer</string>
+    <string name="menu_show_bars">Show DMM header and footer</string>
+    <string name="menu_exit">Exit</string>
+    <string name="quality_title">Stream quality</string>
+    <string name="quality_high">High</string>
+    <string name="quality_mid">Medium</string>
+    <string name="quality_low">Low</string>
+    <string name="quality_high_detail">High: 1280×720, 6–8 Mbps</string>
+    <string name="quality_mid_detail">Medium: 1280×720, 2 Mbps</string>
+    <string name="quality_low_detail">Low: 960×540, 2 Mbps</string>
 </resources>

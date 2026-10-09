@@ -3,25 +3,91 @@
 
 use std::error::Error;
 use std::net::TcpListener;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use serde::{Deserialize, Serialize};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use url::Url;
 
 const GAME_URL: &str = "https://play-cloud.games.dmm.com/cloudgame/gameplay/doaxvv";
 
-/// DMM embeds the Ubitus player without a quality, so it defaults to "mid"
-/// (2 Mbps). Reload the player frame asking for "high" (6-8 Mbps).
-const HIGH_QUALITY_JS: &str = r#"
-if (location.hostname === 'dcgp-game.ugamenow.com' &&
-    location.pathname.startsWith('/gungnir/') && location.search &&
-    !/[?&]profile\.quality=/.test(location.search)) {
-    location.replace(location.href + '&profile.quality=high');
+/// Ubitus quality tiers of the desktop720p profile DMM uses for DOAXVV.
+const QUALITIES: [(&str, &str); 3] = [
+    ("high", "High: 1280×720, 6–8 Mbps"),
+    ("mid", "Medium: 1280×720, 2 Mbps"),
+    ("low", "Low: 960×540, 2 Mbps"),
+];
+
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+struct Settings {
+    quality: String,
+    hide_bars: bool,
 }
-"#;
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { quality: "high".into(), hide_bars: true }
+    }
+}
+
+impl Settings {
+    fn path(app: &AppHandle) -> Option<PathBuf> {
+        app.path().app_config_dir().ok().map(|d| d.join("settings.json"))
+    }
+
+    fn load(app: &AppHandle) -> Self {
+        Self::path(app)
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self, app: &AppHandle) {
+        if let Some(path) = Self::path(app) {
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            if let Ok(json) = serde_json::to_vec_pretty(self) {
+                let _ = std::fs::write(path, json);
+            }
+        }
+    }
+
+    /// Page tweaks injected into every frame. DMM embeds the Ubitus player
+    /// without a quality, so it defaults to "mid"; the player frame is
+    /// reloaded with the chosen one. DMM's page reserves 80px for its header
+    /// and footer, given back to the player when the bars are hidden.
+    fn page_script(&self) -> String {
+        let quality = QUALITIES
+            .iter()
+            .find(|(id, _)| *id == self.quality)
+            .map_or("high", |(id, _)| id);
+        format!(
+            r#"(function () {{
+  if (location.hostname === 'dcgp-game.ugamenow.com') {{
+    if (location.pathname.startsWith('/gungnir/') && location.search &&
+        !/[?&]profile\.quality=/.test(location.search)) {{
+      location.replace(location.href + '&profile.quality={quality}');
+    }}
+  }} else if ({hide_bars} && location.hostname === 'play-cloud.games.dmm.com') {{
+    var style = document.createElement('style');
+    style.textContent =
+      '.header, footer {{ display: none !important; }}' +
+      '.screen {{ height: 100vh !important; }}' +
+      '.screen__wrapper {{ height: 100% !important; }}';
+    (document.head || document.documentElement).appendChild(style);
+  }}
+}})();"#,
+            hide_bars = self.hide_bars,
+        )
+    }
+}
 
 /// The running network core (the `vvcore` sidecar).
 struct Core {
@@ -37,14 +103,17 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![retry])
+        .on_menu_event(on_menu_event)
         .setup(|app| {
             let port = free_port()?;
+            let settings = Settings::load(app.handle());
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("VV Browser")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(640.0, 400.0)
+                .menu(build_menu(app.handle(), &settings)?)
                 .proxy_url(Url::parse(&format!("http://127.0.0.1:{port}"))?)
-                .initialization_script_for_all_frames(HIGH_QUALITY_JS)
+                .initialization_script_for_all_frames(settings.page_script())
                 .build()?;
             app.manage(Core {
                 port,
@@ -71,6 +140,64 @@ fn retry(app: AppHandle) -> Result<(), String> {
     start_core(&app).map_err(|e| e.to_string())
 }
 
+fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<Wry>> {
+    let qualities = QUALITIES
+        .iter()
+        .map(|(id, label)| {
+            CheckMenuItem::with_id(app, format!("quality:{id}"), label, true, settings.quality == *id, None::<&str>)
+        })
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let quality_items: Vec<&dyn IsMenuItem<Wry>> = qualities.iter().map(|q| q as &dyn IsMenuItem<Wry>).collect();
+
+    let game = Submenu::with_items(
+        app,
+        "&Game",
+        true,
+        &[
+            &MenuItem::with_id(app, "reload", "&Reload game", true, Some("F5"))?,
+            &Submenu::with_items(app, "Stream &quality", true, &quality_items)?,
+            &CheckMenuItem::with_id(app, "hide_bars", "&Hide DMM header and footer", true, settings.hide_bars, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "exit", "E&xit", true, None::<&str>)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&game])
+}
+
+fn on_menu_event(app: &AppHandle, event: MenuEvent) {
+    let id = event.id().as_ref();
+    let mut settings = Settings::load(app);
+    match id {
+        "reload" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.reload();
+            }
+            return;
+        }
+        "exit" => {
+            app.exit(0);
+            return;
+        }
+        "hide_bars" => settings.hide_bars = !settings.hide_bars,
+        _ => match id.strip_prefix("quality:") {
+            Some(q) if q != settings.quality => settings.quality = q.to_string(),
+            Some(_) => {
+                // Clicking the current tier unchecked it; restore the menu.
+                if let (Some(window), Ok(menu)) = (app.get_webview_window("main"), build_menu(app, &settings)) {
+                    let _ = window.set_menu(menu);
+                }
+                return;
+            }
+            None => return,
+        },
+    }
+    // Page tweaks are fixed when the webview is created, so apply the new
+    // settings by restarting. The saved relay keeps the reconnect short.
+    settings.save(app);
+    stop_core(app);
+    app.restart();
+}
+
 fn free_port() -> std::io::Result<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
 }
@@ -86,6 +213,7 @@ fn start_core(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .shell()
         .sidecar("vvcore")?
         .args(["-listen", &format!("127.0.0.1:{}", core.port)])
+        .args(state_dir_args(app))
         .spawn()?;
     *core.child.lock().unwrap() = Some(child);
 
@@ -128,6 +256,15 @@ fn start_core(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         }
     });
     Ok(())
+}
+
+/// Lets the core remember the relay that worked, so DMM keeps seeing the same
+/// IP across launches.
+fn state_dir_args(app: &AppHandle) -> Vec<String> {
+    match app.path().app_data_dir() {
+        Ok(dir) => vec!["-state-dir".into(), dir.to_string_lossy().into_owned()],
+        Err(_) => Vec::new(),
+    }
 }
 
 fn stop_core<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {

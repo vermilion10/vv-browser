@@ -1,6 +1,7 @@
 package dev.vvbrowser
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.os.Bundle
@@ -23,11 +24,13 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
+import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
+import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import dev.vvbrowser.mobile.Logger
@@ -49,6 +52,11 @@ class MainActivity : ComponentActivity() {
     private var connecting = false
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var pageScript: ScriptHandler? = null
+
+    private val prefs by lazy { getSharedPreferences("settings", MODE_PRIVATE) }
+    private val quality get() = prefs.getString(PREF_QUALITY, null) ?: Quality.HIGH.param
+    private val hideBars get() = prefs.getBoolean(PREF_HIDE_BARS, true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,12 +69,9 @@ class MainActivity : ComponentActivity() {
         setContentView(root)
         hideSystemBars()
 
+        // Back opens the in-game menu, so nothing has to sit on top of the game.
         onBackPressedDispatcher.addCallback(this) {
-            when {
-                customView != null -> customViewCallback?.onCustomViewHidden()
-                webView.canGoBack() -> webView.goBack()
-                else -> finish()
-            }
+            if (customView != null) customViewCallback?.onCustomViewHidden() else showMenu()
         }
 
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
@@ -97,11 +102,7 @@ class MainActivity : ComponentActivity() {
             webViewClient = GameWebViewClient()
             webChromeClient = FullscreenChromeClient()
         }
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            // DMM embeds the Ubitus player without a quality, so it defaults to
-            // "mid" (2 Mbps). Reload the player frame asking for "high" (6-8 Mbps).
-            WebViewCompat.addDocumentStartJavaScript(webView, HIGH_QUALITY_JS, setOf(UBITUS_ORIGIN))
-        }
+        installPageScript()
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             // The Ubitus player is embedded from a different site than DMM.
@@ -150,7 +151,7 @@ class MainActivity : ComponentActivity() {
 
         worker.execute {
             val addr = try {
-                Mobile.start()
+                Mobile.start(filesDir.absolutePath)
             } catch (e: Exception) {
                 main.post { showError(e.message ?: e.toString()) }
                 return@execute
@@ -173,6 +174,65 @@ class MainActivity : ComponentActivity() {
         if (webView.url == null) {
             webView.loadUrl(GAME_URL)
         }
+    }
+
+    /**
+     * Injects the page tweaks: the stream quality for the Ubitus player, and
+     * optionally hiding DMM's header and footer so the player fills the screen.
+     */
+    private fun installPageScript() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
+        pageScript?.remove()
+        pageScript = WebViewCompat.addDocumentStartJavaScript(
+            webView, pageScript(quality, hideBars), setOf(UBITUS_ORIGIN, DMM_ORIGIN),
+        )
+    }
+
+    private fun showMenu() {
+        val items = arrayOf(
+            getString(R.string.menu_resume),
+            getString(R.string.menu_reload),
+            getString(R.string.menu_quality, getString(Quality.of(quality).label)),
+            getString(if (hideBars) R.string.menu_show_bars else R.string.menu_hide_bars),
+            getString(R.string.menu_exit),
+        )
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setItems(items) { _, which ->
+                when (which) {
+                    1 -> reloadGame()
+                    2 -> showQualityPicker()
+                    3 -> {
+                        prefs.edit { putBoolean(PREF_HIDE_BARS, !hideBars) }
+                        installPageScript()
+                        reloadGame()
+                    }
+                    4 -> finish()
+                }
+            }
+            .show()
+    }
+
+    private fun showQualityPicker() {
+        val options = Quality.entries
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(R.string.quality_title)
+            .setSingleChoiceItems(
+                options.map { getString(it.description) }.toTypedArray(),
+                options.indexOf(Quality.of(quality)),
+            ) { dialog, which ->
+                dialog.dismiss()
+                if (options[which].param != quality) {
+                    prefs.edit { putString(PREF_QUALITY, options[which].param) }
+                    installPageScript()
+                    reloadGame()
+                }
+            }
+            .show()
+    }
+
+    /** Reloads the DMM page, which also starts a new stream session. */
+    private fun reloadGame() {
+        if (webView.url == null) startCore() else webView.reload()
     }
 
     private fun showError(message: String) {
@@ -262,11 +322,43 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "vvbrowser"
         const val GAME_URL = "https://play-cloud.games.dmm.com/cloudgame/gameplay/doaxvv"
         private const val UBITUS_ORIGIN = "https://dcgp-game.ugamenow.com"
-        private const val HIGH_QUALITY_JS = """
-            if (location.pathname.startsWith('/gungnir/') && location.search &&
-                !/[?&]profile\.quality=/.test(location.search)) {
-                location.replace(location.href + '&profile.quality=high');
-            }
-        """
+        private const val DMM_ORIGIN = "https://play-cloud.games.dmm.com"
+        private const val PREF_QUALITY = "quality"
+        private const val PREF_HIDE_BARS = "hide_bars"
+
+        /**
+         * DMM embeds the Ubitus player without a quality, so it defaults to
+         * "mid"; the player frame is reloaded with the chosen one. DMM's page
+         * reserves 80px for its header and footer, given back to the player
+         * when the bars are hidden.
+         */
+        private fun pageScript(quality: String, hideBars: Boolean) = """
+            (function () {
+              if (location.hostname === 'dcgp-game.ugamenow.com') {
+                if (location.pathname.startsWith('/gungnir/') && location.search &&
+                    !/[?&]profile\.quality=/.test(location.search)) {
+                  location.replace(location.href + '&profile.quality=$quality');
+                }
+              } else if ($hideBars && location.hostname === 'play-cloud.games.dmm.com') {
+                var style = document.createElement('style');
+                style.textContent =
+                  '.header, footer { display: none !important; }' +
+                  '.screen { height: 100vh !important; }' +
+                  '.screen__wrapper { height: 100% !important; }';
+                (document.head || document.documentElement).appendChild(style);
+              }
+            })();
+        """.trimIndent()
+    }
+}
+
+/** Ubitus quality tiers of the desktop720p profile DMM uses for DOAXVV. */
+private enum class Quality(val param: String, val label: Int, val description: Int) {
+    HIGH("high", R.string.quality_high, R.string.quality_high_detail),
+    MID("mid", R.string.quality_mid, R.string.quality_mid_detail),
+    LOW("low", R.string.quality_low, R.string.quality_low_detail);
+
+    companion object {
+        fun of(param: String) = entries.firstOrNull { it.param == param } ?: HIGH
     }
 }

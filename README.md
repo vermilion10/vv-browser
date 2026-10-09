@@ -12,7 +12,14 @@ The game is only available from Japan. VV Browser connects to a Japanese [VPN Ga
 - `android/`: the Android app (Android 13 or newer), a full-screen WebView routed through the core.
 - `desktop/`: the Windows app, a Tauri window that runs the core as a sidecar process.
 
-Both apps request the stream's high quality tier (1280x720, 6-8 Mbps) rather than the default 2 Mbps.
+## Features
+
+- **No system VPN.** The Japanese connection lives inside the app, and only the hosts that check your region use it.
+- **Stable relay.** The app remembers the relay that worked and reuses it on later launches, so DMM keeps seeing the same Japanese IP. Frequent IP changes can trigger DMM's suspicious-login checks.
+- **Stream quality.** Choose High (1280×720, 6–8 Mbps, the default), Medium (1280×720, 2 Mbps) or Low (960×540, 2 Mbps). The DMM page on its own always uses Medium.
+- **Full-screen game.** DMM's header and footer are hidden so the player fills the window. You can turn this off.
+
+On Android, press **Back** for the in-game menu (Resume, Reload game, Stream quality, DMM header and footer, Exit). On Windows, use the **Game** menu; F5 reloads the game.
 
 ## Android app
 
