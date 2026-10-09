@@ -56,7 +56,7 @@ chrome.exe --user-data-dir=%TEMP%\vvbrowser --proxy-server=http://127.0.0.1:8899
 
 | Hosts | Route |
 |---|---|
-| `*.dmm.com`, `*.dmm.co.jp`, `dcgp-game.ugamenow.com`, `ipinfo.io` | Through the Japanese relay |
+| `*.dmm.com`, `*.dmm.co.jp`, `*.dmmapis.com`, `dcgp-game.ugamenow.com`, `ipinfo.io` | Through the Japanese relay |
 | `gc-*.ugamenow.com` (game stream) and everything else | Direct |
 
 ## License

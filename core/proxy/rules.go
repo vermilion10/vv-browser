@@ -40,6 +40,7 @@ func DefaultRules() Rules {
 		{"gc-*.ugamenow.com", Direct},
 		{"*.dmm.com", Tunnel},
 		{"*.dmm.co.jp", Tunnel},
+		{"*.dmmapis.com", Tunnel},
 		{"dcgp-game.ugamenow.com", Tunnel},
 		{"ipinfo.io", Tunnel}, // lets users confirm the tunnel's exit country
 	}

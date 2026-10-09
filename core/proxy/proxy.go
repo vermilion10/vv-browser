@@ -4,6 +4,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -51,7 +52,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	route := s.Rules.Match(r.Host)
 	upstream, err := s.dialer(route).DialContext(r.Context(), "tcp", r.Host)
 	if err != nil {
-		log.WithError(err).Warnf("%-6s CONNECT %s", route, r.Host)
+		logDialError(err, "%-6s CONNECT %s", route, r.Host)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
@@ -84,6 +85,16 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	pipe(client, upstream)
+}
+
+// logDialError reports a failed upstream request. Browsers routinely cancel
+// speculative connections, so cancellations are only logged at debug level.
+func logDialError(err error, format string, args ...any) {
+	if errors.Is(err, context.Canceled) {
+		log.WithError(err).Debugf(format, args...)
+		return
+	}
+	log.WithError(err).Warnf(format, args...)
 }
 
 // pipe copies both ways until either side finishes, then closes both.
@@ -122,7 +133,7 @@ func (s *Server) handlePlain(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := s.transports[route].RoundTrip(out)
 	if err != nil {
-		log.WithError(err).Warnf("%-6s %s %s", route, r.Method, r.URL.Host)
+		logDialError(err, "%-6s %s %s", route, r.Method, r.URL.Host)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
