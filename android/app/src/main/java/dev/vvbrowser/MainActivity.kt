@@ -98,9 +98,9 @@ class MainActivity : ComponentActivity() {
             webChromeClient = FullscreenChromeClient()
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
-            // Ubitus picks the stream profile from navigator.platform. Android
-            // gets at most 768x432 at 1.5 Mbps, desktop 1280x720 at up to 8 Mbps.
-            WebViewCompat.addDocumentStartJavaScript(webView, DESKTOP_PLATFORM_JS, setOf(UBITUS_ORIGIN))
+            // DMM embeds the Ubitus player without a quality, so it defaults to
+            // "mid" (2 Mbps). Reload the player frame asking for "high" (6-8 Mbps).
+            WebViewCompat.addDocumentStartJavaScript(webView, HIGH_QUALITY_JS, setOf(UBITUS_ORIGIN))
         }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
@@ -262,7 +262,11 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "vvbrowser"
         const val GAME_URL = "https://play-cloud.games.dmm.com/cloudgame/gameplay/doaxvv"
         private const val UBITUS_ORIGIN = "https://dcgp-game.ugamenow.com"
-        private const val DESKTOP_PLATFORM_JS =
-            "Object.defineProperty(Navigator.prototype, 'platform', { get: () => 'Win32' });"
+        private const val HIGH_QUALITY_JS = """
+            if (location.pathname.startsWith('/gungnir/') && location.search &&
+                !/[?&]profile\.quality=/.test(location.search)) {
+                location.replace(location.href + '&profile.quality=high');
+            }
+        """
     }
 }
